@@ -1,0 +1,253 @@
+blueprint:
+  name: Dimming from two buttons
+  description: ""
+  domain: automation
+  input:
+    light:
+      name: Light
+      selector:
+        entity:
+          domain: light
+    long_press:
+      name: Long Press time
+      description: How long you should press button for starting dimming
+      selector:
+        number:
+          mode: slider
+          min: 0
+          max: 3000
+          unit_of_measurement: milliseconds
+      default: 1000
+    down_button:
+      name: Down Button
+      selector:
+        entity:
+          domain: binary_sensor
+    trans_d:
+      name: Transition time down
+      description: Slowing of dimming while toggle button "Down"
+      selector:
+        number:
+          mode: slider
+          min: 0
+          max: 20
+          unit_of_measurement: seconds
+      default: 10
+    up_button:
+      name: Up Button
+      selector:
+        entity:
+          domain: binary_sensor
+    trans_up:
+      name: Transition time up
+      description: Slowing of dimming while toggle button "UP"
+      selector:
+        number:
+          mode: slider
+          min: 0
+          max: 20
+          unit_of_measurement: seconds
+      default: 0
+    dimstep_up:
+      name: Up steps
+      description: Steps in % for dimming Up
+      selector:
+        number:
+          mode: slider
+          min: 1
+          max: 10
+          unit_of_measurement: percent
+      default: 3
+    dimsp_up:
+      name: Up time step
+      description: Teme between steps dim Up
+      selector:
+        number:
+          mode: slider
+          min: 50
+          max: 500
+          unit_of_measurement: milliseconds
+      default: 200
+    dimstep_down:
+      name: Down steps
+      description: Steps in % for dimming Down
+      selector:
+        number:
+          mode: slider
+          min: -10
+          max: -1
+          unit_of_measurement: percent
+      default: -3
+    dimsp_down:
+      name: Down time step
+      description: Teme between steps dim Down
+      selector:
+        number:
+          mode: slider
+          min: 50
+          max: 500
+          unit_of_measurement: milliseconds
+      default: 200
+trigger:
+  - platform: state
+    entity_id: !input down_button
+    from: "off"
+    to: "on"
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: !input long_press
+    id: Long Press Left
+
+  - platform: state
+    entity_id: !input up_button
+    from: "off"
+    to: "on"
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: !input long_press
+    id: Long Press Right
+  - platform: state
+    entity_id:
+      - input_boolean.long_press_left
+    from: "off"
+    to: "on"
+    id: Dim Down
+  - platform: state
+    entity_id:
+      - input_boolean.long_press_right
+    from: "off"
+    to: "on"
+    id: Dim Up
+  - platform: state
+    entity_id: !input down_button
+    from: "on"
+    to: "off"
+    id: short press left
+  - platform: state
+    entity_id: !input up_button
+    from: "on"
+    to: "off"
+    id: short press right
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - Long Press Left
+        sequence:
+          - action: input_boolean.turn_on
+            metadata: {}
+            data: {}
+            target:
+              entity_id: input_boolean.long_press_left
+      - conditions:
+          - condition: trigger
+            id:
+              - Long Press Right
+        sequence:
+          - action: input_boolean.turn_on
+            metadata: {}
+            data: {}
+            target:
+              entity_id: input_boolean.long_press_right
+      - conditions:
+          - condition: trigger
+            id:
+              - Dim Up
+        sequence:
+          - repeat:
+              sequence:
+                - action: light.turn_on
+                  data:
+                    brightness_step_pct: !input dimstep_up
+                  target:
+                    entity_id: !input light
+                - delay:
+                    hours: 0
+                    minutes: 0
+                    seconds: 0
+                    milliseconds: !input dimsp_up
+              while:
+                - condition: trigger
+                  id:
+                    - Dim Up
+      - conditions:
+          - condition: trigger
+            id:
+              - Dim Down
+        sequence:
+          - repeat:
+              sequence:
+                - action: light.turn_on
+                  target:
+                    entity_id: !input light
+                  data:
+                    brightness_step_pct: !input dimstep_down
+                - delay:
+                    hours: 0
+                    minutes: 0
+                    seconds: 0
+                    milliseconds: !input dimsp_down
+              while:
+                - condition: trigger
+                  id:
+                    - Dim Down
+      - conditions:
+          - condition: trigger
+            id:
+              - short press left
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.long_press_left
+                    state: "off"
+                sequence:
+                  - action: light.toggle
+                    target:
+                      entity_id: !input light
+                    data:
+                      transition: !input trans_d
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.long_press_left
+                    state: "on"
+                sequence:
+                  - action: input_boolean.turn_off
+                    metadata: {}
+                    data: {}
+                    target:
+                      entity_id: input_boolean.long_press_left
+      - conditions:
+          - condition: trigger
+            id:
+              - short press right
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.long_press_right
+                    state: "off"
+                sequence:
+                  - action: light.toggle
+                    metadata: {}
+                    data:
+                      transition: !input trans_up
+                    target:
+                      entity_id: !input light
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.long_press_right
+                    state: "on"
+                sequence:
+                  - action: input_boolean.turn_off
+                    metadata: {}
+                    data: {}
+                    target:
+                      entity_id: input_boolean.long_press_right
+mode: restart
